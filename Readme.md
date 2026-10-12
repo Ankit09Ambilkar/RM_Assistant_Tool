@@ -1,349 +1,749 @@
-# FitWise: Invest in what fits, not just what pays
+# FitWise — Invest in What Fits, Not Just What Pays
 
-FitWise is a decision-support platform for bank **Relationship Managers (RMs)** who sell **structured products**. It puts AI-guided client discovery, payoff analysis on real market data, rule-based suitability checks and an ML barrier-breach risk model into one guided workspace. A **manager** reviews every analysis in a separate admin panel.
+**FitWise** is an AI-powered decision-support platform for bank Relationship Managers (RMs) who work with structured investment products. It combines AI-guided client discovery, real-market payoff analysis, rule-based suitability checks, and machine-learning-based barrier-breach risk estimation in a single workspace.
 
-**Live:** https://fitwise-lud9.onrender.com · **API docs:** https://fitwise-lud9.onrender.com/docs
+A dedicated manager dashboard enables administrators to review analyses, manage Relationship Managers, and monitor suitability and platform activity.
 
-> The free Render plan sleeps after about 15 idle minutes. A cron job calling `https://fitwise-lud9.onrender.com/api/v1/cron` every 10–14 minutes keeps it awake (and keeps the free Supabase project from pausing).
+**Repository:** [Ankit09Ambilkar/RM_Assistant_Tool](https://github.com/Ankit09Ambilkar/RM_Assistant_Tool)
+
+**Live application:** [FitWise](https://fitwise-lud9.onrender.com)  
+**API documentation:** [FastAPI Swagger UI](https://fitwise-lud9.onrender.com/docs)
+
+> **Note:** The application is a hackathon prototype intended for educational and decision-support purposes. It is not investment advice. The free Render instance may sleep after periods of inactivity.
 
 ---
 
-## Contents
+## Table of Contents
+
 - [Features](#features)
-- [How it works](#how-it-works)
-- [Tech stack](#tech-stack)
-- [Project structure](#project-structure)
-- [Run locally](#run-locally)
-- [Environment variables](#environment-variables)
-- [Accounts and roles](#accounts-and-roles)
-- [Pages](#pages)
-- [API endpoints](#api-endpoints)
-- [Calculation rules](#calculation-rules)
-- [ML barrier-breach model](#ml-barrier-breach-model)
-- [AI safety](#ai-safety)
+- [How It Works](#how-it-works)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Accounts and Roles](#accounts-and-roles)
+- [Application Pages](#application-pages)
+- [API Endpoints](#api-endpoints)
+- [Calculation Rules](#calculation-rules)
+- [ML Barrier-Breach Risk Model](#ml-barrier-breach-risk-model)
+- [AI Safety and Reliability](#ai-safety-and-reliability)
 - [Testing](#testing)
-- [Deploy on Render](#deploy-on-render)
-- [Dependencies](#dependencies)
-- [Notes and limitations](#notes-and-limitations)
+- [Deployment](#deployment)
+- [Limitations](#limitations)
 
 ---
 
 ## Features
 
-**For RMs**
-- **AI client discovery:** guided questions build a client profile (goal, amount, horizon, risk appetite, max loss, liquidity, experience, sector exposure), and AI writes a plain-English interpretation of it.
-- **Product configuration:** a Barrier Reverse Convertible on one of 8 underlyings (US and Indian stocks and indices), with notional, tenor, coupon, barrier and strike.
-- **Payoff engine:** 7 market scenarios with coupon, capital returned and total outcome.
-- **Suitability checks:** 4 rules (risk, horizon, loss tolerance, concentration), each rated match, warning or mismatch.
-- **ML breach risk:** a calibrated probability that the barrier is breached, the main factors behind it, and a volatility-only benchmark for comparison.
-- **Live market data:** price, history and volatility from Yahoo Finance.
-- **Explain to client:** an AI summary in simple language, plus a report page.
+### 1. AI-Guided Client Discovery
 
-**For the manager (admin panel)**
-- Dashboard with totals, review status, suitability by dimension and per-RM activity.
-- RM management: add, edit, deactivate.
-- Analysis review: approve, or flag with a note.
+- Collects client information, including investment goals, amount, investment horizon, risk appetite, maximum acceptable loss, liquidity requirements, experience, and sector exposure.
+- Generates plain-English interpretations of client profiles using an LLM.
+- Helps Relationship Managers understand client requirements before configuring an investment product.
 
-**Platform**
-- Real authentication (Supabase Auth). RMs only ever see their own data; the admin panel accepts only manager accounts.
-- Supabase Postgres database, with SQLite as the automatic fallback for local use.
-- Strict input validation on every endpoint.
+### 2. Structured Product Configuration
+
+Configure a **Barrier Reverse Convertible (BRC)** using:
+
+- Underlying stock or market index.
+- Investment notional.
+- Investment tenor.
+- Coupon rate.
+- Barrier level.
+- Strike price.
+
+Supported underlyings include US stocks, Indian stocks, and market indices.
+
+### 3. Payoff Simulation
+
+- Evaluates seven predefined market scenarios.
+- Calculates coupon payments, capital returned, and total investment outcomes.
+- Helps RMs explain potential outcomes under different market conditions.
+
+### 4. Rule-Based Suitability Assessment
+
+Evaluates product suitability across four dimensions:
+
+- Risk appetite compatibility.
+- Investment horizon.
+- Maximum acceptable loss.
+- Sector concentration.
+
+Each dimension receives a **Match**, **Warning**, or **Mismatch** result.
+
+### 5. Machine Learning-Based Barrier-Breach Risk
+
+- Estimates the probability of the underlying closing below the barrier at maturity.
+- Uses historical market features and a gradient-boosting model.
+- Provides contributing risk factors and a volatility-only benchmark.
+- Uses probability calibration to improve the reliability of estimated probabilities.
+
+### 6. Live Market Data
+
+- Retrieves market prices and historical price data through Yahoo Finance using `yfinance`.
+- Calculates historical volatility and related market features.
+- Caches market data to reduce unnecessary requests.
+
+### 7. AI-Powered Client Explanations
+
+- Converts technical product analysis into plain English.
+- Helps RMs explain risks and potential outcomes to clients.
+- Provides a report page for reviewing the analysis.
+
+### 8. Manager Dashboard
+
+- Tracks analysis totals and review status.
+- Displays suitability breakdowns and RM activity.
+- Allows managers to add, edit, or deactivate RMs.
+- Supports approving analyses or flagging them with a review note.
+
+### 9. Authentication and Access Control
+
+- Supabase Auth for email-and-password authentication.
+- Role-based access for RMs and managers.
+- RMs can access only their own client and analysis records.
+- Manager-only endpoints protect administrative operations.
+- Backend endpoints validate incoming data.
 
 ---
 
-## How it works
+## How It Works
 
-```
-Landing → Sign in / Register (Supabase Auth) → role?
-   ├─ RM:      Dashboard → Client discovery → Product configure → Analysis (payoff · suitability · ML risk) → Explain & report
-   └─ Manager: Admin dashboard → RM management → Analysis review (approve / flag)
+### Application Workflow
 
-Browser (React) ──► Render web service (FastAPI)
-                       ├─ /api/v1/*   API routes (JWT check, roles) ──► Supabase Postgres, Supabase Auth
-                       ├─ engine.py   payoff + suitability
-                       ├─ ml/         breach-risk model           ──► Yahoo Finance (yfinance)
-                       ├─ /api/grok   AI proxy (key stays server-side) ──► Groq LLM
-                       └─ /*          built React app (frontend/dist)
+```text
+Landing Page
+     |
+Sign In / Register
+     |
+Role Verification
+     |
+     +--------------------------+
+     |                          |
+Relationship Manager          Manager
+     |                          |
+RM Dashboard                Admin Dashboard
+     |                          |
+Client Discovery            Manage RMs
+     |                          |
+Client Profile              Review Analyses
+     |                          |
+Configure Product           Approve / Flag
+     |
+Payoff Simulation
+     |
+Suitability Assessment
+     |
+ML Barrier-Breach Risk
+     |
+AI Explanation
+     |
+Analysis Report
 ```
+
+### System Architecture
+
+```text
+React + TypeScript Frontend
+             |
+             v
+       FastAPI Backend
+             |
+     +-------+--------+----------------+
+     |                |                |
+     v                v                v
+ Authentication   Payoff Engine    ML Risk Model
+     |                |                |
+     v                v                v
+ Supabase Auth    Suitability      scikit-learn
+                      Rules
+             |
+     +-------+----------------+
+     |                        |
+     v                        v
+Supabase PostgreSQL      Yahoo Finance
+     |
+     v
+Client & Analysis Records
+
+FastAPI AI Proxy
+     |
+     v
+Groq LLM / Supported xAI Grok Configuration
+```
+
+The backend serves both the API and the built React frontend in production.
 
 ---
 
-## Tech stack
+## Technology Stack
 
-| Layer | Technology |
+| Layer | Technologies |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 6, Tailwind CSS v4, React Router 7, Recharts |
+| Frontend | React 19, TypeScript, Vite 6 |
+| UI and Styling | Tailwind CSS v4 |
+| Routing | React Router 7 |
+| Charts | Recharts |
 | Backend | Python 3.13, FastAPI, Pydantic, Uvicorn |
-| Database | Supabase Postgres (psycopg2, pooled), with a SQLite fallback |
-| Auth | Supabase Auth (email + password); the backend verifies ES256 JWTs via JWKS |
-| Market data | yfinance (Yahoo Finance), cached for 15 minutes |
-| ML | scikit-learn HistGradientBoosting + Platt calibration |
-| AI | Groq `openai/gpt-oss-120b` (xAI Grok also supported, auto-detected from the key) |
-| Hosting | Render (one web service) |
+| Database | Supabase PostgreSQL, SQLite fallback |
+| Authentication | Supabase Auth, JWT verification |
+| Market Data | Yahoo Finance, `yfinance` |
+| Machine Learning | scikit-learn, HistGradientBoosting |
+| Probability Calibration | Platt scaling |
+| AI Integration | Groq LLM, supported xAI Grok configuration |
+| Hosting | Render |
 
 ---
 
-## Project structure
+## Project Structure
 
-```
-MIndSparks/
-├── render.yaml               # Render blueprint (build, start, health check, env vars)
-├── start.sh                  # Local: starts backend + frontend together
-├── PROJECT_LOG.md            # Full change log
+```text
+RM_Assistant_Tool/
+├── render.yaml
+├── start.sh
+├── PROJECT_LOG.md
+│
 ├── backend/
-│   ├── main.py               # All API routes + serves the built frontend
-│   ├── auth.py               # JWT verification, roles, Supabase admin helpers
-│   ├── db.py                 # Postgres/SQLite adapter, schema, seed data
-│   ├── engine.py             # Payoff + suitability engine
-│   ├── market.py             # Underlyings + yfinance data
-│   ├── ai.py                 # Groq/Grok proxy (production)
-│   ├── seed_auth.py          # Creates demo RM logins / manager login
-│   ├── test_api.py           # 67 API checks
-│   ├── requirements.txt      # Pinned Python deps
+│   ├── main.py
+│   ├── auth.py
+│   ├── db.py
+│   ├── engine.py
+│   ├── market.py
+│   ├── ai.py
+│   ├── seed_auth.py
+│   ├── test_api.py
+│   ├── requirements.txt
+│   │
 │   └── ml/
-│       ├── features.py       # 16 features shared by training and scoring
-│       ├── model.py          # BreachModel, calibration, explanations
+│       ├── features.py
+│       ├── model.py
 │       ├── train_breach_model.py
-│       ├── serve.py          # Live scoring
+│       ├── serve.py
 │       ├── breach_model.joblib
-│       └── model_card.json   # Metrics, data, limitations
+│       └── model_card.json
+│
 └── frontend/
-    ├── vite.config.ts        # Dev proxy for /api/v1 + dev AI proxy
-    ├── public/               # favicon, fonts
+    ├── vite.config.ts
+    ├── public/
     └── src/
-        ├── App.tsx           # Routes + auth guards
-        ├── store.tsx         # Session, user, data loading
-        ├── lib/              # api.ts, supabase.ts, grok.ts
-        ├── components/       # Layout, LogoMark, MarketCard, BreachRiskCard, story/
-        └── pages/            # RM pages + admin/
+        ├── App.tsx
+        ├── store.tsx
+        ├── lib/
+        │   ├── api.ts
+        │   ├── supabase.ts
+        │   └── grok.ts
+        ├── components/
+        │   ├── Layout
+        │   ├── LogoMark
+        │   ├── MarketCard
+        │   ├── BreachRiskCard
+        │   └── story/
+        └── pages/
+            ├── RM pages
+            └── admin/
 ```
+
+*The structure above summarizes the main components; retain the exact filenames and directories from your current repository.*
 
 ---
 
-## Run locally
+## Getting Started
 
-**Requirements:** Python 3.13+, Node 20+.
+### Prerequisites
+
+Install the following before running the project:
+
+- Python 3.13 or compatible version.
+- Node.js 20 or compatible version.
+- npm.
+- Git.
+- A Supabase project for production authentication and persistent database storage.
+- An AI provider API key for AI-generated explanations.
+
+### 1. Clone the Repository
 
 ```bash
-git clone git@github.com:shri-i/CodeX_Fintech.git
-cd CodeX_Fintech
-cp backend/.env.example backend/.env           # fill in (see below), or leave empty for SQLite + demo login
-cp frontend/.env.example frontend/.env.local   # fill in
+git clone https://github.com/Ankit09Ambilkar/RM_Assistant_Tool.git
+
+cd RM_Assistant_Tool
+```
+
+### 2. Configure Backend Environment
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Add your required configuration to `backend/.env`. For local experimentation, the SQLite fallback and demo authentication may be available without Supabase configuration, depending on the current implementation.
+
+### 3. Configure Frontend Environment
+
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+Add the browser-safe Supabase configuration where required.
+
+### 4. Run the Application
+
+If the repository contains the provided startup script:
+
+```bash
 ./start.sh
 ```
 
-`start.sh` installs everything on the first run, then starts:
-- App: http://localhost:5173
-- Admin: http://localhost:5173/admin
-- API docs: http://localhost:8000/docs
+The script installs dependencies when necessary and starts the backend and frontend.
 
-**Manual start:**
-```bash
-cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn main:app --reload --port 8000
-# second terminal
-cd frontend && npm install && npm run dev
-```
+Local URLs:
 
-**Production-style run (one server, like Render):**
-```bash
-cd frontend && npm run build && cd ../backend
-.venv/bin/uvicorn main:app --port 8000      # app + API on http://localhost:8000
-```
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Admin panel | http://localhost:5173/admin |
+| Backend API | http://localhost:8000 |
+| API documentation | http://localhost:8000/docs |
 
-**Create login accounts (once, after Supabase is configured):**
+### Manual Setup
+
+**Backend**
+
 ```bash
 cd backend
-.venv/bin/python seed_auth.py                       # demo logins for all seeded RMs
-.venv/bin/python seed_auth.py --manager you@x.com   # manager login; prints a random password once
+
+python -m venv .venv
+```
+
+Activate the virtual environment and install the dependencies:
+
+```bash
+# Windows
+.venv\Scripts\activate
+
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+**Frontend**
+
+Open a second terminal:
+
+```bash
+cd frontend
+
+npm install
+npm run dev
+```
+
+### Production-Style Local Run
+
+Build the frontend:
+
+```bash
+cd frontend
+npm run build
+```
+
+Then start FastAPI:
+
+```bash
+cd ../backend
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ---
 
-## Environment variables
+## Environment Variables
 
-Never commit `.env` files; both are git-ignored.
+Never commit `.env` files, private API keys, database passwords, or service-role credentials to GitHub.
 
-**`backend/.env`**
+### Backend — `backend/.env`
 
-| Variable | Description |
+| Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | Supabase **session pooler** connection string (IPv4). Leave empty to use local SQLite. |
-| `SUPABASE_URL` | `https://<project>.supabase.co` |
-| `SUPABASE_SECRET_KEY` | `sb_secret_…` key (server only: registration, password resets) |
-| `ADMIN_EMAILS` | Comma-separated emails allowed into the admin panel |
-| `XAI_API_KEY` | AI key, needed in production. `gsk_…` = Groq, `xai-…` = xAI Grok |
-| `MINDSPARKS_AUTH` | Optional. `off` disables auth (used by tests). |
+| `DATABASE_URL` | PostgreSQL connection string; leave unset for the SQLite fallback when supported. |
+| `SUPABASE_URL` | Supabase project URL. |
+| `SUPABASE_SECRET_KEY` | Server-side Supabase secret used for privileged operations. |
+| `ADMIN_EMAILS` | Comma-separated list of authorized manager email addresses. |
+| `XAI_API_KEY` | AI provider key used by the server-side AI integration. |
+| `MINDSPARKS_AUTH` | Optional authentication setting used by the existing application and tests. |
 
-**`frontend/.env.local`**
+### Frontend — `frontend/.env.local`
 
-| Variable | Description |
+| Variable | Purpose |
 |---|---|
-| `VITE_SUPABASE_URL` | Same Supabase URL |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` key (browser-safe) |
-| `XAI_API_KEY` | AI key, used by the dev server's AI proxy |
-| `GROK_MODEL`, `GROK_API_URL` | Optional overrides |
+| `VITE_SUPABASE_URL` | Supabase project URL. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Browser-safe Supabase publishable key. |
+| `XAI_API_KEY` | Used by the development AI proxy if required by the existing Vite configuration. |
+| `GROK_MODEL` | Optional AI model override. |
+| `GROK_API_URL` | Optional AI API endpoint override. |
 
-Without Supabase settings, the app falls back to a demo sign-in (pick an RM) and SQLite.
+**Security note:** Variables prefixed with `VITE_` can be exposed to the browser. Never put secret keys in frontend environment variables. Keep privileged credentials on the server only.
+
+Variable names above follow the supplied project configuration. Confirm them against the current `.env.example` files before deployment.
 
 ---
 
-## Accounts and roles
+## Accounts and Roles
 
-| Role | Can do | Signs in at |
+| Role | Permissions | Entry Point |
 |---|---|---|
-| **RM** | Own clients, analyses, discovery, reports | `/` → Sign In |
-| **Manager** | Admin dashboard, RM management, reviews | `/admin` |
+| Relationship Manager | Manage own clients, configure products, run analyses, and generate reports. | `/` |
+| Manager | View administrative statistics, manage RMs, and review analyses. | `/admin` |
 
-- **Demo RMs** (seeded): Priya Sharma, Arjun Mehta, Kavya Nair, Rohan Desai, Ananya Gupta, Vikram Singh (On Leave). Emails follow `firstname.lastname@mindsparks.demo`. The shared demo password is set in `backend/seed_auth.py`; change it before sharing the site publicly.
-- **Manager accounts** are listed in `ADMIN_EMAILS`. Passwords are random and never stored in the repo.
-- New RMs can self-register at `/register`. Inactive RMs are blocked.
+Demo accounts and their credentials, if enabled, are defined by the existing seed configuration.
+
+For a production deployment:
+
+- Replace all demo credentials.
+- Create manager accounts using the server-side provisioning process.
+- Configure `ADMIN_EMAILS` with authorized manager email addresses.
+- Ensure inactive RMs cannot continue using the application.
+- Do not publish generated passwords or private credentials.
 
 ---
 
-## Pages
+## Application Pages
 
-| Path | Page |
+| Route | Description |
 |---|---|
-| `/` | Landing page (story, features, FAQ) + sign-in |
+| `/` | Landing page and sign-in |
 | `/register` | RM registration |
-| `/reset-password` | Set a new password from the email link |
+| `/reset-password` | Password reset |
 | `/dashboard` | RM dashboard |
-| `/discovery` | AI client discovery |
-| `/clients`, `/profile/:clientId` | Clients and client profile |
-| `/configure/:clientId` | Product configuration |
-| `/analysis/:analysisId` | Analysis: overview, payoff, suitability, ML risk, explain to client |
-| `/analyses` | All my analyses |
-| `/reports`, `/report/:analysisId` | Reports |
-| `/admin` | Admin dashboard (manager only) |
+| `/discovery` | AI-guided client discovery |
+| `/clients` | Client listing |
+| `/profile/:clientId` | Individual client profile |
+| `/configure/:clientId` | Structured product configuration |
+| `/analysis/:analysisId` | Payoff, suitability, ML risk, and AI explanation |
+| `/analyses` | RM analysis history |
+| `/reports` | Available reports |
+| `/report/:analysisId` | Individual analysis report |
+| `/admin` | Manager dashboard |
 | `/admin/rms` | RM management |
 | `/admin/reviews` | Analysis review |
 
 ---
 
-## API endpoints
+## API Endpoints
 
-Base path `/api/v1`. Send `Authorization: Bearer <Supabase access token>`.
-**Access:** Public = no sign-in · Signed in = any user · RM = signed-in RM (own data only) · Manager = admin only.
+Base URL:
 
-| Method | Path | Access | Description |
+```text
+/api/v1
+```
+
+Authenticated requests use a Supabase access token:
+
+```http
+Authorization: Bearer <SUPABASE_ACCESS_TOKEN>
+```
+
+### Authentication and System
+
+| Method | Endpoint | Access | Purpose |
 |---|---|---|---|
-| GET | `/health` | Public | Server and database status |
-| GET/POST/HEAD | `/cron` | Public | Keep-alive for an external cron job: wakes the service, pings the DB, warms the ML model |
-| GET | `/me` | Signed in | Current user, RM profile, admin flag |
-| POST | `/auth/register` | Public | Register a new RM (login + RM record) |
-| POST | `/engine/analyze` | RM | Payoff scenarios + 4 suitability checks |
-| POST | `/ml/breach-risk` | RM | Barrier-breach probability + factors |
-| GET | `/market/underlyings` | RM | The 8 supported underlyings |
-| GET | `/market/{ticker}` | RM | Price, history, volatility |
-| GET | `/clients` | RM | My clients |
+| GET | `/health` | Public | Server and database health |
+| GET/POST/HEAD | `/cron` | Public | Service and database keep-alive |
+| GET | `/me` | Signed in | Current user and role information |
+| POST | `/auth/register` | Public | Register a new RM |
+
+### Analysis and Market Data
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| POST | `/engine/analyze` | RM | Calculate payoff and suitability |
+| POST | `/ml/breach-risk` | RM | Estimate barrier-breach risk |
+| GET | `/market/underlyings` | RM | List supported underlyings |
+| GET | `/market/{ticker}` | RM | Retrieve market data |
+
+### Client and Analysis Management
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| GET | `/clients` | RM | Retrieve own clients |
 | POST | `/clients` | RM | Create a client |
 | PUT | `/clients/{cid}` | RM | Update a client |
-| GET | `/analyses` | RM | My analyses |
+| GET | `/analyses` | RM | Retrieve own analyses |
 | POST | `/analyses` | RM | Save an analysis |
-| PUT | `/analyses/{aid}` | RM | Edit product terms |
-| GET | `/rms` | Manager | All RMs with stats |
-| GET | `/rms/{rm_id}` | Signed in | One RM (RMs: only themselves) |
+| PUT | `/analyses/{aid}` | RM | Update product terms |
+
+### Manager Operations
+
+| Method | Endpoint | Access | Purpose |
+|---|---|---|---|
+| GET | `/rms` | Manager | List RMs and statistics |
+| GET | `/rms/{rm_id}` | Authorized user | Retrieve an RM record |
 | POST | `/rms` | Manager | Add an RM |
-| PUT | `/rms/{rm_id}` | Manager | Edit / deactivate an RM |
-| PUT | `/analyses/{aid}/review` | Manager | Approve or flag (note required to flag) |
-| GET | `/admin/stats` | Manager | Admin dashboard numbers |
+| PUT | `/rms/{rm_id}` | Manager | Edit or deactivate an RM |
+| PUT | `/analyses/{aid}/review` | Manager | Approve or flag an analysis |
+| GET | `/admin/stats` | Manager | Retrieve administrative statistics |
 | POST | `/admin/reset` | Manager | Reset demo data |
 
-**AI proxy (outside `/api/v1`)**
+### AI Integration
 
-| Method | Path | Access | Description |
+| Method | Endpoint | Access | Purpose |
 |---|---|---|---|
-| GET | `/api/grok/status` | Public | Whether AI is configured, provider, model |
-| POST | `/api/grok` | Signed in | `{ messages }` → `{ content }` (JSON mode) |
+| GET | `/api/grok/status` | Public | Check AI configuration status |
+| POST | `/api/grok` | Signed in | Generate AI-assisted explanations |
 
-Every other path serves the React app, so deep links work. Missing files return 404.
-
-**Supported underlyings:** NVDA, AAPL, MSFT, TSLA, RELIANCE, HDFCBANK, NIFTY50, SPX.
+Refer to the interactive [API documentation](https://fitwise-lud9.onrender.com/docs) for the deployed API's available routes, request schemas, and response formats.
 
 ---
 
-## Calculation rules
+## Calculation Rules
 
-Product: a **Barrier Reverse Convertible**. The barrier is observed at maturity.
+FitWise models a Barrier Reverse Convertible with the barrier observed at maturity.
 
-- **Payoff:** coupon = notional × coupon% × tenor/12 and is always paid. If the final level is at or above the barrier, the full notional comes back; otherwise the client gets notional × final/strike.
-- **Risk appetite:** product risk is 1 for an index or 2 for a stock, plus 1 if the barrier is 80% or higher. It is compared with the client (Conservative 1, Moderate 2, Aggressive 3).
-- **Horizon:** tenor must be within the client's horizon. A warning appears if liquidity need is High and tenor is over 12 months.
-- **Loss tolerance:** loss in a stress scenario (stock −40%, index −25%) vs the client's max loss. Above the max is a mismatch, any loss within it is a warning, and no loss is a match.
-- **Concentration:** same-sector exposure of 50% or more is a mismatch, 25% or more is a warning. Indices always match.
+### 1. Coupon Calculation
+
+For notional \(N\), annual coupon rate \(c\), and tenor \(T\) in months:
+
+\[
+\text{Coupon}=N\times c\times\frac{T}{12}
+\]
+
+The coupon is assumed to be paid in every simulated scenario under the prototype's product rules.
+
+### 2. Capital Returned
+
+Let \(S_T\) be the final underlying price, \(K\) the strike price, and \(B\) the barrier.
+
+\[
+\text{Capital Returned}=
+\begin{cases}
+N, & S_T\ge B\\
+N\times \frac{S_T}{K}, & S_T<B
+\end{cases}
+\]
+
+Total proceeds equal capital returned plus the coupon. The investor's net profit or loss is calculated relative to the original notional.
+
+These formulas represent the prototype's simplified contract assumptions. Real structured products may have different terms, observation schedules, settlement methods, and issuer-specific conditions.
+
+### 3. Risk Appetite
+
+Product risk is assigned using a simplified rule:
+
+- Index underlying: base score of 1.
+- Stock underlying: base score of 2.
+- Add 1 when the barrier is at least 80%.
+
+The result is compared with the client's risk score:
+
+| Client Risk Appetite | Score |
+|---|---:|
+| Conservative | 1 |
+| Moderate | 2 |
+| Aggressive | 3 |
+
+### 4. Investment Horizon
+
+The product tenor is compared with the client's investment horizon. A warning is generated when liquidity requirements are high and the tenor exceeds 12 months.
+
+### 5. Loss Tolerance
+
+The prototype evaluates a stress scenario of:
+
+- Stocks: 40% decline.
+- Indices: 25% decline.
+
+The estimated stress loss is compared with the client's stated maximum acceptable loss.
+
+### 6. Sector Concentration
+
+| Same-Sector Exposure | Result |
+|---|---|
+| Below 25% | Match |
+| 25% to below 50% | Warning |
+| 50% or above | Mismatch |
+
+Indices are treated as a match under this simplified concentration rule.
 
 ---
 
-## ML barrier-breach model
+## ML Barrier-Breach Risk Model
 
-- **Question:** will the price close below the barrier at maturity, i.e. will the client lose capital?
-- **Data:** 13 years of daily prices for 35 assets (US and Indian large caps and indices), about 600k simulated products (8 barriers × 4 tenors, one start date per week).
-- **Features (16):** 1/3/12-month volatility and momentum, distance from the 52-week high, barrier, tenor, barrier distance in volatility units, downside volatility, skew, kurtosis, worst fall in the past year, volatility trend, index flag.
-- **Model:** gradient boosting with monotonic constraints (risk can't fall as volatility or drawdown rises) plus Platt calibration.
-- **Validation:** strictly out-of-time. It trains on products that matured before 2022 and tests on products that started from 2022 on.
+The machine-learning component estimates the probability that the underlying closes below the specified barrier at maturity.
 
-| Metric (test) | Model | Volatility-only baseline |
-|---|---|---|
-| AUC | **0.756** | 0.735 |
-| Brier score (lower is better) | **0.037** | 0.073 |
+### Dataset
 
-- **Retrain:** `cd backend && .venv/bin/python -m ml.train_breach_model` (rewrites `breach_model.joblib` and `model_card.json`).
-- **Limitations:** survivorship bias (today's large caps); no implied volatility (not free); estimates, not predictions.
+The supplied project documentation describes a training dataset built from:
+
+- Approximately 13 years of historical daily prices.
+- 35 US and Indian large-cap stocks and indices.
+- Approximately 600,000 simulated structured products.
+- Eight barrier configurations and four tenors.
+- Weekly product start dates.
+
+These are project-reported figures and should be verified against the current training pipeline and model card before being presented as independently validated results.
+
+### Feature Engineering
+
+The model uses 16 features, including:
+
+- Short-, medium-, and long-term volatility.
+- Price momentum.
+- Distance from the 52-week high.
+- Barrier level and barrier distance.
+- Tenor.
+- Barrier distance measured in volatility units.
+- Downside volatility.
+- Return skewness and kurtosis.
+- Worst historical decline.
+- Volatility trend.
+- Indicator distinguishing indices from individual stocks.
+
+### Model Architecture
+
+- **Algorithm:** Histogram-based Gradient Boosting.
+- **Calibration:** Platt scaling.
+- **Constraints:** Monotonic constraints designed to prevent estimated risk from decreasing as selected risk factors, such as volatility or drawdown, increase.
+- **Validation:** Out-of-time evaluation, separating earlier maturities from later product start dates.
+
+### Reported Model Performance
+
+The original project documentation reports the following test results:
+
+| Metric | ML Model | Volatility-Only Baseline |
+|---|---:|---:|
+| AUC | 0.756 | 0.735 |
+| Brier Score | 0.037 | 0.073 |
+
+A higher AUC generally indicates better discrimination between outcomes, while a lower Brier score indicates better probabilistic accuracy.
+
+These metrics are reproduced from the supplied project documentation, not independently reproduced here. The Brier score should be interpreted alongside the test-set event rate, calibration plots, and evaluation methodology.
+
+### Retraining the Model
+
+From the backend directory:
+
+```bash
+python -m ml.train_breach_model
+```
+
+Run this command within the configured Python environment. The supplied implementation is intended to regenerate the serialized model and model card.
+
+### Model Limitations
+
+- Historical data can contain survivorship bias.
+- Historical volatility does not capture all forward-looking market expectations.
+- Real-world outcomes may differ from historical and simulated scenarios.
+- Model estimates are not guarantees of future performance.
+- Performance can deteriorate as market conditions change.
 
 ---
 
-## AI safety
+## AI Safety and Reliability
 
-- The API key never reaches the browser: calls go through `/api/grok` (FastAPI in production, the Vite plugin in dev), and only signed-in users can use it.
-- The AI only explains; every number comes from the engine. The prompt forbids inventing prices or probabilities, guarantees, and buy/sell advice.
-- Responses must be valid JSON and are validated in code. Gendered pronouns are rejected and retried once.
-- If AI is unavailable or a response fails validation, the app falls back to rule-based text.
+FitWise separates deterministic financial calculations from AI-generated explanations.
+
+- **Server-side credentials:** Privileged AI API keys remain on the server.
+- **Deterministic calculations:** Payoff figures and suitability outcomes are calculated by application logic rather than generated by the LLM.
+- **Constrained explanations:** The AI is instructed not to invent prices, probabilities, guarantees, or buy/sell recommendations.
+- **Response validation:** AI output is expected to follow a structured JSON format and is validated by the application.
+- **Fallback behavior:** Rule-based explanations can be used if the AI provider is unavailable or the response fails validation.
+- **Role-based access:** Authenticated endpoints enforce user permissions.
+
+AI-generated text is explanatory, not a substitute for independent financial, legal, or compliance review.
 
 ---
 
 ## Testing
 
+Run the backend API tests from the backend directory:
+
 ```bash
-cd backend && .venv/bin/python test_api.py     # 68 checks: validation, auth rules, roles, engine, ML
+python test_api.py
 ```
-The tests run offline with auth disabled and a throwaway SQLite database.
+
+The supplied documentation reports approximately 68 API checks covering validation, authentication, authorization, payoff calculations, and ML integration.
+
+The tests are designed to run offline using a temporary SQLite database and disabled authentication where configured.
+
+For meaningful regression testing, verify the actual test count and ensure the test suite passes against the current repository version.
 
 ---
 
-## Deploy on Render
+## Deployment
 
-`render.yaml` defines a single **Python web service** that builds the React app and serves it from FastAPI.
+The application is designed to run as a single Render web service, with FastAPI serving the built React frontend and API endpoints.
+
+### Deployment Steps
+
+1. Open [Render](https://render.com/).
+2. Create a new Blueprint or Web Service.
+3. Connect your GitHub repository: [Ankit09Ambilkar/RM_Assistant_Tool](https://github.com/Ankit09Ambilkar/RM_Assistant_Tool).
+4. Configure the required environment variables.
+5. Configure Supabase authentication and redirect URLs.
+6. Deploy and verify the health endpoint and API documentation.
+
+### Expected Build Configuration
 
 | Setting | Value |
 |---|---|
 | Build command | `pip install -r backend/requirements.txt && cd frontend && npm ci --include=dev && npm run build` |
 | Start command | `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT` |
-| Health check | `/api/v1/health` |
-| Env vars | `PYTHON_VERSION=3.13.9`, `NODE_VERSION=20.17.0`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `ADMIN_EMAILS`, `XAI_API_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| Health endpoint | `/api/v1/health` |
+| Python version | 3.13.x |
+| Node.js version | 20.x |
 
-Steps:
-1. Render → **New → Blueprint** (or Web Service) → pick this repo and fill in the env vars.
-2. In Supabase → Authentication → URL Configuration, set **Site URL** to the Render URL and add `https://<app>.onrender.com/**` (and `http://localhost:5173/**`) to Redirect URLs.
-3. Every push to `main` redeploys automatically.
+Use the exact versions and environment variables specified by your current `render.yaml` and deployment configuration.
+
+### Supabase Configuration
+
+In Supabase Authentication settings:
+
+- Set the Site URL to your deployed application URL.
+- Add the deployed application's permitted redirect URLs.
+- Add local development redirect URLs when needed.
+- Verify the JWT configuration and server-side database connection.
+
+### Keep-Alive Endpoint
+
+The project provides:
+
+```text
+https://fitwise-lud9.onrender.com/api/v1/cron
+```
+
+An external scheduled request can be used to keep the service warm and periodically access the database, subject to the hosting provider's current policies and limits. Keep-alive requests do not guarantee that a free service will remain continuously available.
 
 ---
 
-## Dependencies
+## Limitations
 
-**Backend:** fastapi 0.142.2 · uvicorn[standard] 0.54.0 · pydantic 2.13.5 · yfinance 1.7.0 · psycopg2-binary 2.9.13 · python-dotenv 1.2.4 · pyjwt[crypto] 2.15.1 · cryptography 50.0.2 · scikit-learn 1.9.1 · scipy 1.18.1 · numpy 2.5.3 · pandas 3.0.6 · joblib 1.6.0.
-These are pinned because the saved model needs matching numpy and scikit-learn versions.
-
-**Frontend:** react 19 · react-dom 19 · react-router-dom 7 · recharts 2 · @supabase/supabase-js 2.
-**Build tools:** vite 6 · @vitejs/plugin-react · tailwindcss 4 · @tailwindcss/vite · typescript 5.
-
-**External services:** Supabase (Postgres + Auth) · Groq · Yahoo Finance · Render.
+- FitWise is a hackathon prototype, not a production-grade investment platform.
+- Market data retrieved through Yahoo Finance may be delayed, incomplete, or rate-limited.
+- The payoff engine implements simplified contract assumptions.
+- Suitability rules are illustrative and do not replace a bank's regulatory suitability process.
+- The ML model estimates historical-pattern-based probabilities and cannot guarantee outcomes.
+- LLM explanations may require human review.
+- Production deployment requires security testing, monitoring, data governance, and financial compliance review.
+- Free hosting and database tiers may impose sleep, storage, and usage limits.
 
 ---
 
-## Notes and limitations
+## Future Improvements
 
-- This is a hackathon prototype and a decision-support tool, not investment advice.
-- Market data comes from Yahoo Finance via yfinance and can be delayed or rate-limited.
-- The **RELIGATH** heading font is a personal-use demo font; buy a licence before any commercial use. The wordmark uses Bitter (Google Fonts).
-- See [PROJECT_LOG.md](PROJECT_LOG.md) for the full change history.
+Potential areas for further development include:
+
+- Expanded structured product support.
+- More detailed market stress testing and scenario analysis.
+- Improved ML calibration and monitoring.
+- Auditable suitability decisions and review histories.
+- Stronger automated security and integration testing.
+- More comprehensive client reports and explainability.
+- Integration with approved market-data providers.
+
+---
+
+## Project Links
+
+- **GitHub Repository:** https://github.com/Ankit09Ambilkar/RM_Assistant_Tool
+- **Live Application:** https://fitwise-lud9.onrender.com
+- **API Documentation:** https://fitwise-lud9.onrender.com/docs
+
+**FitWise — Invest in what fits, not just what pays.**
