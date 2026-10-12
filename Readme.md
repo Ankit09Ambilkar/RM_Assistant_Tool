@@ -1,5 +1,5 @@
 # FitWise — Invest in What Fits, Not Just What Pays
-
+fdndj
 **FitWise** is an AI-powered decision-support platform for bank Relationship Managers (RMs) who work with structured investment products. It combines AI-guided client discovery, real-market payoff analysis, rule-based suitability checks, and machine-learning-based barrier-breach risk estimation in a single workspace.
 
 A dedicated manager dashboard enables administrators to review analyses, manage Relationship Managers, and monitor suitability and platform activity.
