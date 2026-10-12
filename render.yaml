@@ -1,0 +1,32 @@
+# Render Blueprint: one web service runs FastAPI and serves the built React app from frontend/dist.
+# Render → New → Blueprint → pick this repo. Fill the "sync: false" values in the dashboard when asked.
+services:
+  - type: web
+    name: fitwise
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt && cd frontend && npm ci --include=dev && npm run build
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.9
+      - key: NODE_VERSION
+        value: 20.17.0
+      # Backend (secrets: copy from backend/.env)
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      # AI key (copy XAI_API_KEY from frontend/.env.local)
+      - key: XAI_API_KEY
+        sync: false
+      # Frontend build-time values (copy from frontend/.env.local; the publishable key is browser-safe)
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false

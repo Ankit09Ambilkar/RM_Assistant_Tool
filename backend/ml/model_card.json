@@ -1,0 +1,133 @@
+{
+  "name": "Barrier-breach risk model",
+  "algorithm": "Gradient boosting (scikit-learn HistGradientBoosting) + Platt calibration, monotonic constraints",
+  "label": "Price closes below the barrier at maturity",
+  "features": [
+    "vol_1m",
+    "vol_3m",
+    "vol_12m",
+    "mom_1m",
+    "mom_3m",
+    "mom_12m",
+    "drawdown_52w",
+    "barrier",
+    "tenor_months",
+    "barrier_z",
+    "downside_vol_12m",
+    "skew_12m",
+    "kurt_12m",
+    "max_dd_12m",
+    "vol_ratio",
+    "is_index"
+  ],
+  "assets": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "AXISBANK.NS",
+    "BA",
+    "BHARTIARTL.NS",
+    "DIS",
+    "GOOGL",
+    "HDFCBANK.NS",
+    "ICICIBANK.NS",
+    "INFY.NS",
+    "INTC",
+    "ITC.NS",
+    "JNJ",
+    "JPM",
+    "KO",
+    "LT.NS",
+    "MARUTI.NS",
+    "META",
+    "MSFT",
+    "NFLX",
+    "NVDA",
+    "PG",
+    "RELIANCE.NS",
+    "SBIN.NS",
+    "SUNPHARMA.NS",
+    "TCS.NS",
+    "TSLA",
+    "WMT",
+    "XOM",
+    "^DJI",
+    "^GSPC",
+    "^IXIC",
+    "^NSEBANK",
+    "^NSEI"
+  ],
+  "n_assets": 35,
+  "n_examples": 599928,
+  "data_from": "2014-10-06",
+  "data_to": "2026-10-01",
+  "barriers": [
+    0.5,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9
+  ],
+  "tenors": [
+    6,
+    12,
+    18,
+    24
+  ],
+  "test": {
+    "period": "products starting 2022-01-01 or later (out-of-time)",
+    "auc": 0.756,
+    "brier": 0.0373,
+    "baseline_auc": 0.735,
+    "baseline_brier": 0.0732,
+    "base_rate": 0.0401,
+    "n_test": 195256,
+    "calibration": [
+      {
+        "bin": "(-0.001, 0.05]",
+        "predicted": 0.026,
+        "actual": 0.023,
+        "n": 150702
+      },
+      {
+        "bin": "(0.05, 0.1]",
+        "predicted": 0.066,
+        "actual": 0.087,
+        "n": 37610
+      },
+      {
+        "bin": "(0.1, 0.2]",
+        "predicted": 0.129,
+        "actual": 0.148,
+        "n": 6380
+      },
+      {
+        "bin": "(0.2, 0.3]",
+        "predicted": 0.231,
+        "actual": 0.179,
+        "n": 498
+      },
+      {
+        "bin": "(0.3, 0.5]",
+        "predicted": 0.343,
+        "actual": 0.172,
+        "n": 64
+      },
+      {
+        "bin": "(0.5, 1.0]",
+        "predicted": 0.546,
+        "actual": 0.0,
+        "n": 2
+      }
+    ]
+  },
+  "limitations": [
+    "Survivorship bias: the training universe is today's large caps, so risk may be understated for very volatile single stocks. The app shows the volatility-only estimate alongside.",
+    "Historical implied volatility is not available from free data, so it is not a feature.",
+    "Estimates, not predictions: trained on 2013-2026 price behaviour; regimes can change."
+  ],
+  "trained_at": "2026-10-03T21:56:36+00:00"
+}
