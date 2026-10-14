@@ -248,17 +248,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     addClient: async (c) => {
       if (online) {
-        const client = await api.createClient({ rmId: rm?.id ?? rmId, name: c.name, profile: c.profile, interpretation: c.interpretation })
+        const client = await api.createClient({
+          rmId: rm?.id ?? rmId,
+          name: c.name,
+          profile: c.profile,
+          interpretation: c.interpretation,
+          notes: c.notes ?? c.profile?.notes ?? '',
+          extractedFacts: c.extractedFacts ?? c.profile?.extractedFacts ?? [],
+        })
         setState((s) => ({ ...s, clients: [client, ...s.clients] }))
         return client
       }
-      const client: Client = { ...c, id: 'c-' + uid(), createdAt: new Date().toISOString() }
+      const client: Client = {
+        ...c,
+        id: 'c-' + uid(),
+        notes: c.notes ?? c.profile?.notes ?? '',
+        extractedFacts: c.extractedFacts ?? c.profile?.extractedFacts ?? [],
+        createdAt: new Date().toISOString(),
+      }
       setState((s) => ({ ...s, clients: [client, ...s.clients] }))
       return client
     },
     updateClient: async (id, c) => {
       // Save to the backend first so the screen never shows values the server rejected.
-      const saved = online ? await api.updateClient(id, { profile: c.profile, interpretation: c.interpretation }) : null
+      const saved = online
+        ? await api.updateClient(id, {
+            profile: c.profile,
+            interpretation: c.interpretation,
+            notes: c.notes ?? c.profile?.notes,
+            extractedFacts: c.extractedFacts ?? c.profile?.extractedFacts,
+          })
+        : null
       setState((s) => ({ ...s, clients: s.clients.map((x) => (x.id === id ? { ...x, ...(saved ?? c) } : x)) }))
     },
     addAnalysis: async (clientId, product) => {

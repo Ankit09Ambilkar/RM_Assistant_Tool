@@ -70,6 +70,8 @@ class Profile(BaseModel):
     experience: Literal["None", "Some", "Experienced"]
     preferredUnderlying: Ticker
     sectorExposurePct: float = Field(ge=0, le=100)
+    notes: Optional[str] = ""
+    extractedFacts: Optional[list[dict]] = Field(default_factory=list)
 
 
 class Product(BaseModel):
@@ -98,11 +100,15 @@ class ClientIn(BaseModel):
     name: Name
     profile: Profile
     interpretation: LongText = ""
+    notes: Optional[str] = ""
+    extractedFacts: Optional[list[dict]] = Field(default_factory=list)
 
 
 class ClientUpdate(BaseModel):
     profile: Optional[Profile] = None
     interpretation: Optional[LongText] = None
+    notes: Optional[str] = None
+    extractedFacts: Optional[list[dict]] = None
 
 
 class AnalysisIn(BaseModel):
@@ -350,11 +356,16 @@ def create_client(body: ClientIn, user: Me = Depends(require_rm)):
     if user and not user.is_admin:
         body.rmId = user.rm_id
     cid = new_id("c")
+    prof = body.profile.model_dump()
+    if body.notes and not prof.get("notes"):
+        prof["notes"] = body.notes
+    if body.extractedFacts and not prof.get("extractedFacts"):
+        prof["extractedFacts"] = body.extractedFacts
     with db.connect() as c:
         if not c.execute("SELECT 1 FROM rms WHERE id=?", (body.rmId,)).fetchone():
             raise HTTPException(404, "RM not found")
         c.execute("INSERT INTO clients VALUES (?,?,?,?,?,?)",
-                  (cid, body.rmId, body.name, body.profile.model_dump_json(), body.interpretation, now()))
+                  (cid, body.rmId, body.name, json.dumps(prof), body.interpretation, now()))
         return db.client_row(c.execute("SELECT * FROM clients WHERE id=?", (cid,)).fetchone())
 
 
@@ -364,8 +375,19 @@ def update_client(cid: str, body: ClientUpdate, user: Me = Depends(require_rm)):
         row = c.execute("SELECT * FROM clients WHERE id=?", (cid,)).fetchone()
         if not row or not can_access_rm(user, row["rm_id"]):
             raise HTTPException(404, "Client not found")
+        prof = json.loads(row["profile"])
         if body.profile:
-            c.execute("UPDATE clients SET profile=? WHERE id=?", (body.profile.model_dump_json(), cid))
+            p_dump = body.profile.model_dump()
+            if not p_dump.get("notes") and prof.get("notes"):
+                p_dump["notes"] = prof.get("notes")
+            if not p_dump.get("extractedFacts") and prof.get("extractedFacts"):
+                p_dump["extractedFacts"] = prof.get("extractedFacts")
+            prof = p_dump
+        if body.notes is not None:
+            prof["notes"] = body.notes
+        if body.extractedFacts is not None:
+            prof["extractedFacts"] = body.extractedFacts
+        c.execute("UPDATE clients SET profile=? WHERE id=?", (json.dumps(prof), cid))
         if body.interpretation is not None:
             c.execute("UPDATE clients SET interpretation=? WHERE id=?", (body.interpretation, cid))
         return db.client_row(c.execute("SELECT * FROM clients WHERE id=?", (cid,)).fetchone())

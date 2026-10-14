@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { PageHeader } from '../components/ui'
 import { MAX_AMOUNT, interpret } from '../lib/discovery'
 import { UNDERLYINGS, getUnderlying } from '../lib/market'
-import type { Client, ClientProfile } from '../lib/types'
+import type { Client, ClientProfile, ExtractedFact } from '../lib/types'
 import { useAI } from '../lib/grok'
 import { grokInterpretation } from '../lib/ai'
 import { PageLoading, Spinner } from '../components/ui'
@@ -46,6 +46,17 @@ function ProfileForm({ client }: { client: Client }) {
   const [profile, setProfile] = useState<ClientProfile | undefined>(client?.profile)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+
+  // Relationship Manager Notes & Confirmed Facts state
+  const initialNotes = client?.notes || client?.profile?.notes || ''
+  const [notes, setNotes] = useState(initialNotes)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const initialFacts: ExtractedFact[] =
+    (client?.extractedFacts && client.extractedFacts.length > 0)
+      ? client.extractedFacts
+      : (client?.profile?.extractedFacts ?? [])
+  const [facts, setFacts] = useState<ExtractedFact[]>(initialFacts)
+
   // Grok interpretation is generated for a "snapshot" of the profile; edits show the live rule-based text until refreshed.
   const [aiProfile, setAiProfile] = useState(JSON.stringify(client?.profile ?? {}))
   const ai = useAI(
@@ -73,7 +84,17 @@ function ProfileForm({ client }: { client: Client }) {
     setSaving(true)
     setSaveError('')
     try {
-      await updateClient(client!.id, { profile: profile!, interpretation })
+      const updatedProfile: ClientProfile = {
+        ...profile!,
+        notes: notes.trim(),
+        extractedFacts: facts,
+      }
+      await updateClient(client!.id, {
+        profile: updatedProfile,
+        notes: notes.trim(),
+        extractedFacts: facts,
+        interpretation,
+      })
       navigate(next)
     } catch (e) {
       setSaveError((e as Error).message)
@@ -121,6 +142,94 @@ function ProfileForm({ client }: { client: Client }) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* RM Meeting Notes & Confirmed Facts Card */}
+      <div className="card mt-4 border-navy/15 bg-white p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📝</span>
+            <span className="text-xs font-bold tracking-widest text-navy uppercase">
+              RM Meeting Notes & Confirmed Facts
+            </span>
+          </div>
+          {!editingNotes && (
+            <button
+              onClick={() => setEditingNotes(true)}
+              className="cursor-pointer text-xs font-semibold text-accent hover:underline"
+            >
+              {notes ? 'Edit Notes' : '+ Add Notes'}
+            </button>
+          )}
+        </div>
+
+        {/* Notes Display / Edit */}
+        {editingNotes ? (
+          <div className="mt-3">
+            <textarea
+              rows={3}
+              className="input text-xs"
+              placeholder="Enter or update client meeting notes, conversational background, or remarks..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingNotes(false)}
+                className="cursor-pointer rounded border border-navy/20 px-2.5 py-1 text-xs font-semibold text-navy hover:bg-cream-dark"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : notes ? (
+          <div className="mt-3 rounded-md border border-cream-dark bg-cream/50 p-3">
+            <p className="whitespace-pre-wrap text-xs text-navy/80 leading-relaxed font-sans">
+              {notes}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs italic text-navy/50">
+            No meeting notes recorded during discovery.
+          </p>
+        )}
+
+        {/* Confirmed Facts Chips */}
+        {facts.length > 0 ? (
+          <div className="mt-4 border-t border-cream-dark pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-navy/70 uppercase">
+                Verified Facts from Notes ({facts.length})
+              </span>
+              <span className="text-[10px] text-navy/50">Confirmed by RM</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {facts.map((f) => (
+                <div
+                  key={f.field}
+                  className="flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-navy shadow-2xs"
+                >
+                  <span className="font-semibold text-emerald-800">✓ {f.label}:</span>
+                  <span className="font-medium text-navy">{f.displayValue ?? String(f.value)}</span>
+                  {f.confidence && (
+                    <span
+                      className={`rounded px-1 text-[9px] font-bold uppercase ${
+                        f.confidence === 'high' ? 'bg-emerald-200/80 text-emerald-900' : 'bg-amber-200/80 text-amber-900'
+                      }`}
+                    >
+                      {f.confidence}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : notes ? (
+          <p className="mt-3 border-t border-cream-dark pt-2 text-[11px] italic text-navy/50">
+            No structured facts were extracted or confirmed from notes.
+          </p>
+        ) : null}
       </div>
 
       <div className="card mt-4 bg-accent p-5 text-[#ffffff]">

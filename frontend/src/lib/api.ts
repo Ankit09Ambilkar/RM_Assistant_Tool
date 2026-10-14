@@ -1,6 +1,6 @@
 // FastAPI backend client (proxied by Vite at /api/v1 → http://127.0.0.1:8000/api/v1).
 import { useEffect, useState } from 'react'
-import type { Analysis, Client, ClientProfile, EngineResult, MarketData, ProductTerms, RM, ReviewStatus } from './types'
+import type { Analysis, Client, ClientProfile, EngineResult, ExtractedFact, MarketData, ProductTerms, RM, ReviewStatus } from './types'
 import { payoffCurve, presetScenarios } from './payoff'
 import { concernCount, runSuitability } from './suitability'
 import { accessToken } from './supabase'
@@ -97,8 +97,14 @@ export const api = {
   updateRm: (id: string, rm: Partial<RM>) => req<RM>(`/rms/${id}`, { method: 'PUT', body: body(rm) }),
 
   clients: (rmId?: string) => req<Client[]>(`/clients${rmId ? `?rm_id=${rmId}` : ''}`),
-  createClient: (c: { rmId: string; name: string; profile: ClientProfile; interpretation: string }) =>
-    req<Client>('/clients', { method: 'POST', body: body(c) }),
+  createClient: (c: {
+    rmId: string
+    name: string
+    profile: ClientProfile
+    interpretation: string
+    notes?: string
+    extractedFacts?: ExtractedFact[]
+  }) => req<Client>('/clients', { method: 'POST', body: body(c) }),
   updateClient: (id: string, c: Partial<Client>) => req<Client>(`/clients/${id}`, { method: 'PUT', body: body(c) }),
 
   analyses: (rmId?: string, includeResults = true) =>

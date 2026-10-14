@@ -163,8 +163,17 @@ def rm_row(r) -> dict:
 
 
 def client_row(r) -> dict:
-    return {"id": r["id"], "rmId": r["rm_id"], "name": r["name"], "profile": json.loads(r["profile"]),
-            "interpretation": r["interpretation"] or "", "createdAt": r["created_at"]}
+    prof = json.loads(r["profile"])
+    return {
+        "id": r["id"],
+        "rmId": r["rm_id"],
+        "name": r["name"],
+        "profile": prof,
+        "notes": prof.get("notes", ""),
+        "extractedFacts": prof.get("extractedFacts", []),
+        "interpretation": r["interpretation"] or "",
+        "createdAt": r["created_at"],
+    }
 
 
 def analysis_row(r) -> dict:
