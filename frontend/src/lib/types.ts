@@ -4,6 +4,29 @@ export type RiskAppetite = 'Conservative' | 'Moderate' | 'Aggressive'
 export type Level = 'Low' | 'Medium' | 'High'
 export type Experience = 'None' | 'Some' | 'Experienced'
 
+export interface ExtractedFact {
+  field: string
+  label: string
+  value: string | number
+  displayValue?: string
+  confidence?: 'high' | 'medium' | 'low'
+  confirmed: boolean
+  sourceText?: string
+}
+
+export interface MissingFieldInfo {
+  field: string
+  label: string
+  reason: string
+}
+
+export interface ExtractionResult {
+  facts: ExtractedFact[]
+  missingFields: MissingFieldInfo[]
+  summary: string
+  source: 'grok' | 'demo'
+}
+
 export interface ClientProfile {
   goal: Goal
   investmentAmount: number
@@ -14,6 +37,8 @@ export interface ClientProfile {
   experience: Experience
   preferredUnderlying: string // ticker
   sectorExposurePct: number // existing exposure to the preferred underlying's sector
+  notes?: string
+  extractedFacts?: ExtractedFact[]
 }
 
 export interface RM {
@@ -41,6 +66,8 @@ export interface Client {
   rmId?: string
   name: string
   profile: ClientProfile
+  notes?: string
+  extractedFacts?: ExtractedFact[]
   interpretation: string
   createdAt: string
 }
